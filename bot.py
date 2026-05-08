@@ -170,6 +170,15 @@ def echo_message_3(message):
     bot.reply_to(message, " Вот еще один экологический сайт: https://www.wwf.org/")
 
 
+
+@bot.message_handler(commands=['eco_2'])
+def echo_message_2(message):
+    bot.reply_to(message, "Вот еще один экологический сайт: https://www.greenpeace.org/")
+
+@bot.message_handler(commands=['eco_3'])
+def echo_message_2(message):
+    bot.reply_to(message, "")
+
 logging.basicConfig(level=logging.INFO)
 logging.info("starting bot")
 
