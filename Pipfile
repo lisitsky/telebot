@@ -5,9 +5,7 @@ name = "pypi"
 
 [packages]
 pytelegrambotapi = "*"
-keras = "*"
 pillow = "*"
-tensorflow = "==2.15"
 
 [dev-packages]
 watchdog = "*"

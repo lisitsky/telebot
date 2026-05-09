@@ -1,12 +1,44 @@
+from collections import defaultdict
 import logging
+from openai import OpenAI
 import telebot
 import random
 import os
 
-from model import get_class
+
 from bot_logic import gen_pass, gen_emodji, flip_coin
-from bot_token import BOT_TOKEN 
+from tokens import BOT_TOKEN, OPENAI_API_KEY
+
 bot = telebot.TeleBot(BOT_TOKEN)
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+dialog_history = defaultdict(list)
+
+# Максимум последних фраз
+MAX_HISTORY = 5
+
+SYSTEM_PROMPT = """
+Ты экологический помощник.
+
+Ты отвечаешь только на темы:
+- экология
+- сортировка мусора
+- переработка
+- защита природы
+- климат
+- уменьшение выбросов CO2
+- экономия воды и энергии
+- устойчивый образ жизни
+
+Если вопрос не относится к экологии —
+вежливо скажи, что ты специализируешься только на экологических темах.
+
+Отвечай простым и понятным языком.
+"""
+
+
+
+
     
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
@@ -56,35 +88,86 @@ def send_help(message):
 
 # Handle '/start' and '/help'
 @bot.message_handler(commands=['say'])
-def send_welcome(message):
+def gpt_answer(message):
     bot.reply_to(message, """\
-Hi there, I am EchoBot.
-I am here to echo your kind words back to you. Just say anything nice and I'll say the exact same thing to you!\
+Привет! 🌱
+Я экологический бот.
+Спроси меня про сортировку мусора, защиту природы или снижение выбросов.
 """)
 
 
 # Handle all other messages with content_type 'text' (content_types defaults to ['text'])
 @bot.message_handler(func=lambda message: True)
 def echo_message(message):
-    bot.reply_to(message, message.text)
+    user_id = message.from_user.id
+    user_text = message.text
 
-@bot.message_handler(content_types=['photo'])
-def get_photo(message):
-    file_info = bot.get_file(message.photo[-1].file_id)
-    file_name = file_info.file_path.split('/')[-1]
-    downloaded_file = bot.download_file(file_info.file_path)
-    with open(file_name, 'wb') as new_file:
-        new_file.write(downloaded_file)
+    logging.info(f"Received message from user {user_id}: {user_text}")
+
+    # Добавляем сообщение пользователя в историю
+    dialog_history[user_id].append({
+        "role": "user",
+        "content": user_text
+    })
+
+    # Оставляем только последние 5 сообщений
+    dialog_history[user_id] = dialog_history[user_id][-MAX_HISTORY:]
+
+    messages = [
+        {
+            "role": "system",
+            "content": SYSTEM_PROMPT
+        }
+    ]
+
+    messages.extend(dialog_history[user_id])
+
+    # logging.debug(f"Sending messages to OpenAI for user {user_id}: {messages}")
+ 
+    thinking_message = bot.reply_to(message,
+        "🤔 I am thinking..."
+    )
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=messages,
+            temperature=0.7,
+        )
+
+        bot_reply = response.choices[0].message.content
+
+        logging.info(f"Received response from OpenAI for user {user_id}: {bot_reply}")
+
+        # Сохраняем ответ бота
+        dialog_history[user_id].append({
+            "role": "assistant",
+            "content": bot_reply
+        })
+
+        # Опять обрезаем историю
+        dialog_history[user_id] = dialog_history[user_id][-MAX_HISTORY:]
+
+        bot.delete_message(thinking_message.chat.id, thinking_message.message_id)
+        
+        bot.reply_to(message, bot_reply)
+
+    except Exception as e:
+        logging.error(f"Error while processing message from user {user_id}: {str(e)}")
+
+        bot.reply_to(message, f"Ошибка: {str(e)}")
+
     
-    bot.reply_to(message, "Крутая фотка!")
+
+
 
 @bot.message_handler(commands=['eco_2'])
 def echo_message_2(message):
     bot.reply_to(message, "Вот еще один экологический сайт: https://www.greenpeace.org/")
 
 @bot.message_handler(commands=['eco_3'])
-def echo_message_2(message):
-    bot.reply_to(message, "")
+def echo_message_3(message):
+    bot.reply_to(message, " Вот еще один экологический сайт: https://www.wwf.org/")
 
 
 logging.basicConfig(level=logging.INFO)
@@ -92,7 +175,7 @@ logging.info("starting bot")
 
 bot.infinity_polling(
     logger_level=logging.INFO,
-    restart_on_change=True,
+    # restart_on_change=True,
 )
 
     
