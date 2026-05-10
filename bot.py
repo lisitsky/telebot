@@ -52,15 +52,6 @@ def send_hello(message):
 def send_bye(message):
     bot.reply_to(message, "Пока! Удачи!")
 
-@bot.message_handler(commands=['mem'])
-def send_mem(message):
-    img_dir = 'bot/images'
-    # А вот так можно подставить имя файла из переменной!
-    img_name = random.choice(os.listdir(img_dir))
-    with open(f'{img_dir}/{img_name}', 'rb') as f:   # type: ignore
-        bot.send_photo(message.chat.id, f)  
-
-
 @bot.message_handler(commands=['eco'])
 def send_eco(message):
     bot.reply_to(message, "Привет вот твой сайте:  https://free-eco.ru/articles/top-20-ekologicheskih-saytov ")
